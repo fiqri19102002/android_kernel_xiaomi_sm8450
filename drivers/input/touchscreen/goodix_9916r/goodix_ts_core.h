@@ -710,6 +710,7 @@ struct goodix_ts_core {
 
 	struct notifier_block ts_notifier;
 	struct goodix_ts_esd ts_esd;
+	bool esd_initialized;
 
 /*N17 code for HQ-291656 by gaoxue at 2023/5/9 start*/
 #ifdef CONFIG_FB
@@ -918,5 +919,6 @@ void goodix_tools_exit(void);
 /*N17 code for HQ-291116 by gaoxue at 2023/4/24 start*/
 int goodix_ts_get_lockdown_info(struct goodix_ts_core *cd);
 /*N17 code for HQ-291116 by gaoxue at 2023/4/24 end*/
+int goodix_ts_esd_init(struct goodix_ts_core *cd);
 
 #endif
