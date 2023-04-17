@@ -1931,7 +1931,6 @@ static int goodix_ts_resume(struct goodix_ts_core *core_data)
 
 	ts_info("Resume start");
 	atomic_set(&core_data->suspended, 0);
-	hw_ops->irq_enable(core_data, false);
 
 	cancel_delayed_work_sync(&core_data->gesture_work);
 
