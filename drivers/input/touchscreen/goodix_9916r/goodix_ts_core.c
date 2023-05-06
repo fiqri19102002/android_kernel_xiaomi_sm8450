@@ -1335,7 +1335,8 @@ static void goodix_ts_report_finger(struct input_dev *dev,
 		if (global_spi_parent_device != NULL) {
 			pm_runtime_set_autosuspend_delay(global_spi_parent_device, 250);
 			pm_runtime_use_autosuspend(global_spi_parent_device);
-			pm_runtime_enable(global_spi_parent_device);
+			if (!pm_runtime_enabled(global_spi_parent_device))
+				pm_runtime_enable(global_spi_parent_device);
 		}
 	} else if (!touch_num && pre_finger_num) { // last touch up
 		input_report_key(dev, BTN_TOUCH, 0);
@@ -1343,7 +1344,8 @@ static void goodix_ts_report_finger(struct input_dev *dev,
 		if (global_spi_parent_device != NULL) {
 			pm_runtime_set_autosuspend_delay(global_spi_parent_device, 50);
 			pm_runtime_use_autosuspend(global_spi_parent_device);
-			pm_runtime_enable(global_spi_parent_device);
+			if (!pm_runtime_enabled(global_spi_parent_device))
+				pm_runtime_enable(global_spi_parent_device);
 		}
 	}
 	pre_finger_num = touch_num;
