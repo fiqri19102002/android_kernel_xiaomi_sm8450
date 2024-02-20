@@ -215,7 +215,7 @@ static int cpu_thermal_init(void)
 	return ret;
 }
 
-static void destory_thermal_cpu()
+static void destory_thermal_cpu(void)
 {
 	struct cpufreq_device *priv, *tmp;
 	list_for_each_entry_safe(priv, tmp, &cpufreq_dev_list, node) {
@@ -914,7 +914,7 @@ out:
 	return 0;
 }
 
-static void create_thermal_message_node()
+static void create_thermal_message_node(void)
 {
 	int ret = 0;
 	struct kernfs_node *sysfs_sd = NULL;
