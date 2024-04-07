@@ -40,6 +40,7 @@
 #define HAP_CFG_V3				0x3
 #define HAP_CFG_V4				0x4
 
+#define DEBUG
 #define HAP_CFG_STATUS_DATA_MSB_REG		0x09
 /* STATUS_DATA_MSB definitions while MOD_STATUS_SEL is 0 */
 #define AUTO_RES_CAL_DONE_BIT			BIT(5)
@@ -592,6 +593,7 @@ struct haptics_chip {
 	struct class			hap_class;
 	struct regulator		*hpwr_vreg;
 	struct hrtimer			hbst_off_timer;
+	struct hrtimer			dph_off_timer; /*DIRECT_PLAY turning off timer*/
 	struct notifier_block		hboost_nb;
 	int				fifo_empty_irq;
 	u32				hpwr_voltage_mv;
@@ -1049,6 +1051,10 @@ static int haptics_get_closeloop_lra_period(
 	bool auto_res_done;
 	u64 tmp;
 	int rc;
+	//protect low rate of xbl f0 abnormal for L18 only
+	int f0_mix, f0_max, f0_default, f0_cnt;
+	int rc1, rc2, rc3, rc4;
+	struct device_node *node = chip->dev->of_node;
 
 	/* read RC_CLK_CAL enabling mode */
 	rc = haptics_read(chip, chip->cfg_addr_base,
@@ -1177,6 +1183,36 @@ static int haptics_get_closeloop_lra_period(
 		tmp = div_u64(tmp, last_good_tlra_cl_sts);
 		tmp = div_u64(tmp, 293);
 		config->rc_clk_cal_count = div_u64(tmp, config->t_lra_us);
+		//protect low rate of xbl f0 abnormal for L18 only
+		if (in_boot) {
+			u32  xbl_f0 = USEC_PER_SEC / config->cl_t_lra_us;
+			dev_err(chip->dev, "xbl f0  =%d \n", xbl_f0);
+			rc1 = of_property_read_u32(node, "qcom,lra-f0-min", &f0_mix);
+			if (rc1 < 0) {
+				dev_err(chip->dev, "lra-f0-min failed, rc=%d\n", rc);
+			}
+			rc2 = of_property_read_u32(node, "qcom,lra-f0-max", &f0_max);
+			if (rc2 < 0) {
+				dev_err(chip->dev, "lra-f0-max failed, rc=%d\n", rc);
+			}
+			rc3 = of_property_read_u32(node, "qcom,lra-f0-default", &f0_default);
+			if (rc3 < 0) {
+				dev_err(chip->dev, "lra-f0-default failed, rc=%d\n", rc);
+			}
+			rc4 = of_property_read_u32(node, "qcom,lra-f0-cal-count", &f0_cnt);
+			if (rc4 < 0) {
+				dev_err(chip->dev, "lra-f0-cal-count failed, rc=%d\n", rc);
+			}
+			if (rc1 >= 0 && rc2 >= 0 && rc3 >= 0 && rc4 >= 0) {
+				if (xbl_f0 > f0_max || xbl_f0 < f0_mix) {
+					dev_err(chip->dev, "xbl f0 abnormal: %d ~ 0x%x use default: %d ~ 0x%x f0:%d - %d after boot\n",xbl_f0, config->rc_clk_cal_count, f0_default, f0_cnt, f0_mix, f0_max);
+					config->cl_t_lra_us = USEC_PER_SEC / f0_default;
+					config->rc_clk_cal_count = f0_cnt;
+				}
+			} else {
+				dev_err(chip->dev, "lra-f0: default min max count must set together in dtsi\n");
+			}
+		}
 	} else {
 		dev_err(chip->dev, "Can't get close-loop LRA period in rc_clk_cal mode %u\n",
 				rc_clk_cal);
@@ -1609,8 +1645,6 @@ static int haptics_enable_play(struct haptics_chip *chip, bool en)
 	if (chip->hw_type == HAP525_HV && play->pattern_src == PATTERN_MEM)
 		val |= FIELD_PREP(PATX_MEM_SEL_MASK, play->effect->pat_sel);
 
-	if (play->brake && !play->brake->disabled)
-		val |= BRAKE_EN_BIT;
 
 	if (en)
 		val |= PLAY_EN_BIT;
@@ -2060,7 +2094,7 @@ static int haptics_set_fifo(struct haptics_chip *chip, struct fifo_cfg *fifo)
 	return 0;
 }
 
-static int haptics_load_constant_effect(struct haptics_chip *chip, u8 amplitude)
+static int haptics_load_constant_effect(struct haptics_chip *chip, u8 amplitude, u32 length_us)
 {
 	struct haptics_play_info *play = &chip->play;
 	u32 hdrm_mv, vmax_mv = chip->config.vmax_mv;
@@ -2075,6 +2109,10 @@ static int haptics_load_constant_effect(struct haptics_chip *chip, u8 amplitude)
 
 	/* No effect data when playing constant waveform */
 	play->effect = NULL;
+
+	/* set play time */
+	play->length_us = length_us;
+	dev_dbg(chip->dev, "play->length_us is %u us", play->length_us);
 
 	/* Fix Vmax to (hpwr_vreg_mv - hdrm_mv) in non-HBOOST regulator case */
 	if (is_haptics_external_powered(chip)) {
@@ -2103,7 +2141,7 @@ static int haptics_load_constant_effect(struct haptics_chip *chip, u8 amplitude)
 		goto unlock;
 
 	/* Always enable LRA auto resonance for DIRECT_PLAY */
-	rc = haptics_enable_autores(chip, !chip->config.is_erm);
+	rc = haptics_enable_autores(chip, false);
 	if (rc < 0)
 		goto unlock;
 
@@ -2212,7 +2250,7 @@ static int haptics_init_custom_effect(struct haptics_chip *chip)
 	chip->custom_effect->pattern = NULL;
 	chip->custom_effect->brake = NULL;
 	chip->custom_effect->id = UINT_MAX;
-	chip->custom_effect->vmax_mv = chip->config.vmax_mv;
+	chip->custom_effect->vmax_mv = 9100;
 	chip->custom_effect->t_lra_us = chip->config.t_lra_us;
 	chip->custom_effect->src = FIFO;
 	chip->custom_effect->auto_res_disable = true;
@@ -2328,6 +2366,7 @@ static int haptics_load_custom_effect(struct haptics_chip *chip,
 
 	play->effect = chip->custom_effect;
 	play->brake = NULL;
+	dev_dbg(chip->dev, "set magnitude on custom effect, rc=%d\n", magnitude);
 	play->vmax_mv = (magnitude * chip->custom_effect->vmax_mv) / 0x7fff;
 	rc = haptics_set_vmax_mv(chip, play->vmax_mv);
 	if (rc < 0)
@@ -2536,7 +2575,7 @@ static int haptics_upload_effect(struct input_dev *dev,
 		amplitude = tmp / 0x7fff;
 		dev_dbg(chip->dev, "upload constant effect, length = %dus, amplitude = %#x\n",
 				length_us, amplitude);
-		haptics_load_constant_effect(chip, amplitude);
+		haptics_load_constant_effect(chip, amplitude, length_us);
 		if (rc < 0) {
 			dev_err(chip->dev, "set direct play failed, rc=%d\n",
 					rc);
@@ -2616,6 +2655,12 @@ static int haptics_playback(struct input_dev *dev, int effect_id, int val)
 		rc = haptics_enable_play(chip, true);
 		if (rc < 0)
 			return rc;
+		if (play->pattern_src == DIRECT_PLAY) {
+			u64 length_ns = play->length_us * NSEC_PER_USEC;
+			hrtimer_start(&chip->dph_off_timer,
+					ns_to_ktime(length_ns),
+					HRTIMER_MODE_REL);
+		}
 	} else {
 		if (play->pattern_src == FIFO &&
 				atomic_read(&play->fifo_status.is_busy)) {
@@ -2635,6 +2680,7 @@ static int haptics_erase(struct input_dev *dev, int effect_id)
 	struct haptics_play_info *play = &chip->play;
 	int rc;
 
+	dev_info(chip->dev, "haptics_erase\n");
 	mutex_lock(&play->lock);
 	if ((play->pattern_src == FIFO) &&
 			atomic_read(&play->fifo_status.is_busy)) {
@@ -4152,6 +4198,13 @@ static int haptics_parse_per_effect_dt(struct haptics_chip *chip,
 	if (!effect)
 		return -EINVAL;
 
+	rc = of_property_read_u32(node, "qcom,effect-id", &effect->id);
+	if (rc < 0) {
+		dev_err(chip->dev, "read qcom,effect-id failed, rc=%d\n",
+				rc);
+		return rc;
+	}
+
 	effect->vmax_mv = config->vmax_mv;
 	rc = of_property_read_u32(node, "qcom,wf-vmax-mv", &tmp);
 	if (rc < 0)
@@ -5249,7 +5302,7 @@ static ssize_t lra_frequency_hz_show(struct class *c,
 	if (chip->config.cl_t_lra_us == 0)
 		return -EINVAL;
 
-	cl_f_lra = USEC_PER_SEC / chip->config.cl_t_lra_us;
+	cl_f_lra = USEC_PER_SEC * 10 / chip->config.cl_t_lra_us;
 	return scnprintf(buf, PAGE_SIZE, "%d Hz\n", cl_f_lra);
 }
 static CLASS_ATTR_RO(lra_frequency_hz);
@@ -5334,6 +5387,21 @@ static enum hrtimer_restart haptics_disable_hbst_timer(struct hrtimer *timer)
 		dev_err(chip->dev, "disable boost vreg failed, rc=%d\n", rc);
 	else
 		dev_dbg(chip->dev, "boost vreg is disabled\n");
+
+	return HRTIMER_NORESTART;
+}
+
+static enum hrtimer_restart haptics_disable_dph_timer(struct hrtimer *timer)
+{
+	struct haptics_chip *chip = container_of(timer,
+			struct haptics_chip, dph_off_timer);
+	int rc;
+
+	rc = haptics_enable_play(chip, false);
+	if (rc < 0)
+		dev_err(chip->dev, "disable haptics play failed, rc =%d\n", rc);
+	else
+		dev_dbg(chip->dev, "disable direct play haptics with timer\n");
 
 	return HRTIMER_NORESTART;
 }
@@ -5439,6 +5507,8 @@ static int haptics_probe(struct platform_device *pdev)
 	chip->fifo_empty_irq_en = false;
 	hrtimer_init(&chip->hbst_off_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 	chip->hbst_off_timer.function = haptics_disable_hbst_timer;
+	hrtimer_init(&chip->dph_off_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+	chip->dph_off_timer.function = haptics_disable_dph_timer;
 
 	atomic_set(&chip->play.fifo_status.is_busy, 0);
 	atomic_set(&chip->play.fifo_status.written_done, 0);
@@ -5595,6 +5665,8 @@ static int haptics_suspend_config(struct device *dev)
 	rc = haptics_enable_hpwr_vreg(chip, false);
 	if (rc < 0)
 		return rc;
+
+	hrtimer_cancel(&chip->dph_off_timer);
 
 	return haptics_module_enable(chip, false);
 }
