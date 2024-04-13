@@ -12,10 +12,17 @@
 #include "main.h"
 #include "qmi.h"
 #include "genl.h"
+#include "hwid.h"
 
 #define WLFW_SERVICE_INS_ID_V01		1
 #define WLFW_CLIENT_ID			0x4b4e454c
 #define BDF_FILE_NAME_PREFIX		"bdwlan"
+#define ELF_BDF_FILE_NAME_M16T		"bd_m16t.elf"
+#define ELF_BDF_FILE_NAME_M16T_GF	"bd_m16tgf.elf"
+#define ELF_BDF_FILE_NAME_M16T_GF_GLOBAL	"bd_m16tgfgl.elf"
+#define ELF_BDF_FILE_NAME_M16T_GLOBAL	"bd_m16tgl.elf"
+#define ELF_BDF_FILE_NAME_M16T_INDIA	"bd_m16tin.elf"
+#define ELF_BDF_FILE_NAME_M16T_GF_INDIA	"bd_m16tgfin.elf"
 #define ELF_BDF_FILE_NAME		"bdwlan.elf"
 #define ELF_BDF_FILE_NAME_GF		"bdwlang.elf"
 #define ELF_BDF_FILE_NAME_PREFIX	"bdwlan.e"
@@ -639,15 +646,41 @@ static int cnss_get_bdf_file_name(struct cnss_plat_data *plat_priv,
 {
 	char filename_tmp[MAX_FIRMWARE_NAME_LEN];
 	int ret = 0;
+	uint32_t hw_platform_ver = 0;
+	uint32_t hw_country_ver = 0;
+
+	hw_country_ver = get_hw_country_version();
+	hw_platform_ver = get_hw_version_platform();
 
 	switch (bdf_type) {
 	case CNSS_BDF_ELF:
 		/* Board ID will be equal or less than 0xFF in GF mask case */
 		if (plat_priv->board_info.board_id == 0xFF) {
-			if (plat_priv->chip_info.chip_id & CHIP_ID_GF_MASK)
-				snprintf(filename_tmp, filename_len,
-					 ELF_BDF_FILE_NAME_GF);
-			else
+			if (plat_priv->chip_info.chip_id & CHIP_ID_GF_MASK) {
+				if (hw_platform_ver == HARDWARE_PROJECT_M16T) {
+					if ((uint32_t)CountryGlobal == hw_country_ver)
+						snprintf(filename_tmp, filename_len,
+							ELF_BDF_FILE_NAME_M16T_GF_GLOBAL);
+					else if ((uint32_t)CountryIndia == hw_country_ver)
+						snprintf(filename_tmp, filename_len,
+							ELF_BDF_FILE_NAME_M16T_GF_INDIA);
+					else
+						snprintf(filename_tmp, filename_len,
+							ELF_BDF_FILE_NAME_M16T_GF);
+				} else
+					snprintf(filename_tmp, filename_len,
+						 ELF_BDF_FILE_NAME_GF);
+			} else if (hw_platform_ver == HARDWARE_PROJECT_M16T) {
+				if ((uint32_t)CountryGlobal == hw_country_ver)
+					snprintf(filename_tmp, filename_len,
+						ELF_BDF_FILE_NAME_M16T_GLOBAL);
+				else if ((uint32_t)CountryIndia == hw_country_ver)
+					snprintf(filename_tmp, filename_len,
+						ELF_BDF_FILE_NAME_M16T_INDIA);
+				else
+					snprintf(filename_tmp, filename_len,
+						ELF_BDF_FILE_NAME_M16T);
+			} else
 				snprintf(filename_tmp, filename_len,
 					 ELF_BDF_FILE_NAME);
 		} else if (plat_priv->board_info.board_id < 0xFF) {
