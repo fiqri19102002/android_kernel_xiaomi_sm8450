@@ -1017,6 +1017,49 @@ static ssize_t gesture_single_tap_value_show(struct device *dev,
 	return snprintf(buf, PAGE_SIZE, "%d\n", 1);
 }
 
+static ssize_t gesture_single_tap_enabled_show(struct device *dev,
+					       struct device_attribute *attr,
+					       char *buf)
+{
+	struct xiaomi_touch_interface *touch_data = NULL;
+
+	if (!touch_pdata) {
+		return -ENOMEM;
+	}
+
+	touch_data = touch_pdata->touch_data[0];
+
+	if (!touch_data->getModeValue)
+		return -ENOMEM;
+
+	return snprintf(buf, PAGE_SIZE, "%d\n",
+			touch_data->getModeValue(Touch_Singletap_Gesture,
+						 GET_CUR_VALUE));
+}
+
+static ssize_t gesture_single_tap_enabled_store(struct device *dev,
+						struct device_attribute *attr,
+						const char *buf, size_t count)
+{
+	struct xiaomi_touch_interface *touch_data = NULL;
+	unsigned int input;
+
+	if (!touch_pdata) {
+		return -ENOMEM;
+	}
+	touch_data = touch_pdata->touch_data[0];
+
+	if (!touch_data->setModeValue)
+		return -ENOMEM;
+
+	if (sscanf(buf, "%d", &input) < 0 || input > 1)
+		return -EINVAL;
+
+	touch_data->setModeValue(Touch_Singletap_Gesture, input);
+
+	return count;
+}
+
 static ssize_t fod_press_status_show(struct device *dev,
 				     struct device_attribute *attr, char *buf)
 {
@@ -1087,6 +1130,8 @@ static DEVICE_ATTR(update_rawdata, (S_IRUGO | S_IWUSR | S_IWGRP), update_rawdata
 			update_rawdata_store);
 static DEVICE_ATTR(fod_press_status, (0664), fod_press_status_show, NULL);
 
+static DEVICE_ATTR_RW(gesture_single_tap_enabled);
+
 static DEVICE_ATTR(gesture_single_tap_state, (0664), gesture_single_tap_value_show, NULL);
 
 static struct attribute *touch_attr_group[] = {
@@ -1114,6 +1159,7 @@ static struct attribute *touch_attr_group[] = {
 	&dev_attr_update_rawdata.attr,
 	&dev_attr_suspend_state.attr,
 	&dev_attr_fod_press_status.attr,
+	&dev_attr_gesture_single_tap_enabled.attr,
 	&dev_attr_gesture_single_tap_state.attr,
 	NULL,
 };
