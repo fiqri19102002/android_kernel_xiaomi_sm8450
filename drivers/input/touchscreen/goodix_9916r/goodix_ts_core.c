@@ -46,9 +46,6 @@ struct goodix_ts_core *goodix_core_data;
 
 static int goodix_send_ic_config(struct goodix_ts_core *cd, int type);
 
-/* N17 code for HQ-296762 by jiangyue at 2023/6/2 start */
-#include "../xiaomi/xiaomi_touch.h"
-/* N17 code for HQ-296762 by jiangyue at 2023/6/2 end */
 /* N17 code for HQ-290598 by jiangyue at 2023/6/6 start */
 static void goodix_set_gesture_work(struct work_struct *work);
 static int goodix_get_charging_status(void);
@@ -2868,6 +2865,8 @@ static int goodix_set_cur_value(int gtp_mode, int gtp_value)
 	}
 /* N17 code for HQ-290598 by jiangyue at 2023/6/6 start */
 	if (gtp_mode == Touch_Doubletap_Mode && goodix_core_data && gtp_value >= 0) {
+		xiaomi_touch_interfaces.touch_mode[gtp_mode][SET_CUR_VALUE] = gtp_value;
+		xiaomi_touch_interfaces.touch_mode[gtp_mode][GET_MAX_VALUE] = gtp_value;
 		if (gtp_value) {
 			goodix_core_data->gesture_type |= GESTURE_DOUBLE_TAP;
 		} else  {
