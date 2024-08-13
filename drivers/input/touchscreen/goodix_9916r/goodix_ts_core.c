@@ -842,32 +842,6 @@ static ssize_t goodix_ts_charger_info_store(struct device *dev,
 	return count;
 }
 
-/* aod gesture show */
-static ssize_t goodix_ts_aod_show(struct device *dev,
-				struct device_attribute *attr, char *buf)
-{
-	int r = 0;
-	r = snprintf(buf, PAGE_SIZE, "state:%s\n",
-			goodix_core_data->aod_status ?
-			"enabled" : "disabled");
-	return r;
-}
-/* aod gesture_store */
-static ssize_t goodix_ts_aod_store(struct device *dev,
-					struct device_attribute *attr,
-					const char *buf, size_t count)
-{
-	if (!buf || count <= 0)
-		return -EINVAL;
-	if (buf[0] != '0') {
-		goodix_core_data->aod_status = 1;
-		queue_work(goodix_core_data->gesture_wq, &goodix_core_data->gesture_work);
-	} else {
-		goodix_core_data->aod_status = 0;
-		queue_work(goodix_core_data->gesture_wq, &goodix_core_data->gesture_work);
-	}
-	return count;
-}
 /* N17 code for HQ-290598 by jiangyue at 2023/6/6 end */
 
 static DEVICE_ATTR(driver_info, 0440,
@@ -893,8 +867,6 @@ static DEVICE_ATTR(die_info, 0440,
 /* N17 code for HQ-290598 by jiangyue at 2023/6/6 start */
 static DEVICE_ATTR(charger_info, 0664,
 		goodix_ts_charger_info_show, goodix_ts_charger_info_store);
-static DEVICE_ATTR(aod, 0664,
-		goodix_ts_aod_show, goodix_ts_aod_store);
 /* N17 code for HQ-290598 by jiangyue at 2023/6/6 end */
 
 static struct attribute *sysfs_attrs[] = {
@@ -910,7 +882,6 @@ static struct attribute *sysfs_attrs[] = {
 	&dev_attr_die_info.attr,
 /* N17 code for HQ-290598 by jiangyue at 2023/6/6 start */
 	&dev_attr_charger_info.attr,
-	&dev_attr_aod.attr,
 /* N17 code for HQ-290598 by jiangyue at 2023/6/6 end */
 	NULL,
 };
@@ -2722,14 +2693,6 @@ static void goodix_set_gesture_work(struct work_struct *work)
 	struct goodix_ts_core *core_data =
 		container_of(work, struct goodix_ts_core, gesture_work);
 
-	ts_info("aod is 0x%x", core_data->aod_status);
-	ts_info("enable is 0x%x", core_data->gesture_type);
-	if (core_data->aod_status)
-		core_data->gesture_type |= GESTURE_SINGLE_TAP;
-	else
-		core_data->gesture_type &= ~GESTURE_SINGLE_TAP;
-	ts_info("set gesture_enabled:%d", core_data->gesture_type);
-
 	if(core_data->gesture_type != 0)
 		goodix_gesture_enable(core_data->gesture_type != 0);
 }
@@ -2875,11 +2838,19 @@ static int goodix_set_cur_value(int gtp_mode, int gtp_value)
 		queue_work(goodix_core_data->gesture_wq, &goodix_core_data->gesture_work);
 		return 0;
 	}
-	if (gtp_mode == Touch_Aod_Enable && goodix_core_data && gtp_value >= 0) {
-		goodix_core_data->aod_status = gtp_value;
+
+	if (gtp_mode == Touch_Singletap_Gesture && goodix_core_data && gtp_value >= 0) {
+		xiaomi_touch_interfaces.touch_mode[gtp_mode][SET_CUR_VALUE] = gtp_value;
+		xiaomi_touch_interfaces.touch_mode[gtp_mode][GET_MAX_VALUE] = gtp_value;
+		if (gtp_value) {
+			goodix_core_data->gesture_type |= GESTURE_SINGLE_TAP;
+		} else  {
+			goodix_core_data->gesture_type &= ~GESTURE_SINGLE_TAP;
+		}
 		queue_work(goodix_core_data->gesture_wq, &goodix_core_data->gesture_work);
 		return 0;
 	}
+
 /* N17 code for HQ-290598 by jiangyue at 2023/6/6 end */
 /* N17 code for HQ-322938 by zhangzhijian5 at 2023/8/28 start */
 	if (gtp_mode >= Touch_Mode_NUM) {
