@@ -273,7 +273,7 @@ static int gsx_gesture_ist(struct goodix_ts_core *cd,
 	int fodx, fody, overlay_area;
 	int ret;
 
-	if (atomic_read(&cd->suspended) == 0 || cd->gesture_type == 0)
+	if (atomic_read(&cd->suspended) == 0 || cd->gesture_type == 0 || cd->nonui_status == 2)
 		return EVT_CONTINUE;
 
 	ret = hw_ops->event_handler(cd, &gs_event);
@@ -290,7 +290,7 @@ static int gsx_gesture_ist(struct goodix_ts_core *cd,
 
 	switch (gs_event.gesture_type) {
 	case GOODIX_GESTURE_SINGLE_TAP:
-		if (cd->gesture_type & GESTURE_SINGLE_TAP) {
+		if ((cd->gesture_type & GESTURE_SINGLE_TAP) && cd->nonui_status == 0) {
 			ts_info("get SINGLE-TAP gesture");
 			notify_gesture_single_tap();
 		} else {
