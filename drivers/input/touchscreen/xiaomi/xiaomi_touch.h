@@ -133,6 +133,8 @@ struct xiaomi_touch_pdata{
 	int fod_press_status_value;
 	struct proc_dir_entry  *last_touch_events_proc;
 	struct last_touch_event *last_touch_events;
+	atomic_t pending_double_tap_gesture;
+	atomic_t pending_single_tap_gesture;
 };
 
 struct xiaomi_touch *xiaomi_touch_dev_get(int minor);
