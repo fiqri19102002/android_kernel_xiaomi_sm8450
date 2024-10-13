@@ -239,7 +239,9 @@ static int gsx_gesture_ist(struct goodix_ts_core *cd,
 	int fodx, fody, overlay_area;
 	int ret;
 
-	if (atomic_read(&cd->suspended) == 0 || cd->gesture_type == 0)
+	ts_debug("gsx_gesture_ist called, gesture type is %d, nonui enabled is %d", cd->gesture_type, cd->nonui_enabled);
+
+	if (atomic_read(&cd->suspended) == 0 || cd->gesture_type == 0 || cd->nonui_enabled)
 		return EVT_CONTINUE;
 
 	ret = hw_ops->event_handler(cd, &gs_event);
@@ -258,12 +260,7 @@ static int gsx_gesture_ist(struct goodix_ts_core *cd,
 	case GOODIX_GESTURE_SINGLE_TAP:
 		if (cd->gesture_type & GESTURE_SINGLE_TAP) {
 			ts_info("get SINGLE-TAP gesture");
-			input_report_key(cd->input_dev, KEY_WAKEUP, 1);
-			// input_report_key(cd->input_dev, KEY_GOTO, 1);
-			input_sync(cd->input_dev);
-			input_report_key(cd->input_dev, KEY_WAKEUP, 0);
-			// input_report_key(cd->input_dev, KEY_GOTO, 0);
-			input_sync(cd->input_dev);
+			notify_gesture_single_tap();
 		} else {
 			ts_debug("not enable SINGLE-TAP");
 		}
@@ -271,10 +268,7 @@ static int gsx_gesture_ist(struct goodix_ts_core *cd,
 	case GOODIX_GESTURE_DOUBLE_TAP:
 		if (cd->gesture_type & GESTURE_DOUBLE_TAP) {
 			ts_info("get DOUBLE-TAP gesture");
-			input_report_key(cd->input_dev, KEY_WAKEUP, 1);
-			input_sync(cd->input_dev);
-			input_report_key(cd->input_dev, KEY_WAKEUP, 0);
-			input_sync(cd->input_dev);
+			notify_gesture_double_tap();
 		} else {
 			ts_debug("not enable DOUBLE-TAP");
 		}
