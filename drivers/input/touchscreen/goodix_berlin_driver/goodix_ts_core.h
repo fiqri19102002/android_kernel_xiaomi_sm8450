@@ -288,7 +288,6 @@ struct goodix_module {
  * @invert_xy: invert x and y for inversely mounted IC
  * @pannel_key_map: key map
  * @fw_name: name of the firmware image
- * @support_thp_fw: whether it is required to disable host touch processing and enable coord mode
  */
 struct goodix_ts_board_data {
 	char avdd_name[GOODIX_MAX_STR_LABLE_LEN];
@@ -311,8 +310,6 @@ struct goodix_ts_board_data {
 	bool pen_enable;
 	char fw_name[GOODIX_MAX_STR_LABLE_LEN];
 	char cfg_bin_name[GOODIX_MAX_STR_LABLE_LEN];
-
-	bool support_thp_fw;
 };
 
 enum goodix_fw_update_mode {
