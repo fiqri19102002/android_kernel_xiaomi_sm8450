@@ -556,6 +556,8 @@ struct goodix_ts_core {
 	struct delayed_work gesture_work;
 
 	bool nonui_enabled;
+
+	int report_rate;
 };
 
 /* external module structures */
