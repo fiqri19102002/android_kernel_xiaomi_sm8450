@@ -2112,30 +2112,25 @@ void goodix_drm_state_change_callback(enum panel_event_notifier_tag tag,
 
 	ts_info("Notification type:%d, early_trigger:%d", event->notif_type, event->notif_data.early_trigger);
 	switch (event->notif_type) {
-		case 1:
-		case 3:
-			if (event->notif_data.early_trigger) {
+		case DRM_PANEL_EVENT_BLANK:
+		case DRM_PANEL_EVENT_BLANK_LP:
+			if (!event->notif_data.early_trigger) {
 				return;
 			}
-			if (atomic_read(&core_data->suspended)) {
-				return;
-			}
-			ts_info("FB_BLANK %s", event->notif_type == 3 ? "POWER DOWN" : "LP");
+			ts_info("FB_BLANK %s", event->notif_type == DRM_PANEL_EVENT_BLANK ? "POWER DOWN" : "LP");
 			flush_workqueue(core_data->event_wq);
 			queue_work(core_data->event_wq, &core_data->suspend_work);
 			break;
-		case 2:
-			if (event->notif_data.early_trigger) {
+		case DRM_PANEL_EVENT_UNBLANK:
+			if (!event->notif_data.early_trigger) {
 				return;
 			}
 			ts_info("FB_BLANK_UNBLANK");
 			flush_workqueue(core_data->event_wq);
 			queue_work(core_data->event_wq, &core_data->resume_work);
 			break;
-		case 4:
-			break;
 		default:
-			ts_err("%s: notification serviced :%d", __func__, event->notif_type);
+			ts_err("%s: notification not serviced :%d", __func__, event->notif_type);
 			break;
 	}
 }
