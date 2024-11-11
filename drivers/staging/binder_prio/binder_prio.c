@@ -10,6 +10,7 @@
 
 static const char *task_name[] = {
 	"droid.launcher3",  // com.android.launcher3
+	"nexuslauncher", // com.google.android.apps.nexuslauncher
 	"ndroid.systemui",  // com.android.systemui
 	"surfaceflinger",
 	"cameraserver",
