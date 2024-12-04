@@ -2863,6 +2863,8 @@ static void goodix_set_gesture_work(struct work_struct *work)
 
 	ts_info("set gesture_enabled:%d", core_data->gesture_enabled);
 	goodix_gesture_enable(core_data->gesture_enabled);
+	if (atomic_read(&core_data->suspended) && core_data->gesture_enabled)
+		core_data->hw_ops->gesture(core_data, core_data->gesture_enabled);
 }
 
 static void goodix_set_game_work(struct work_struct *work)
