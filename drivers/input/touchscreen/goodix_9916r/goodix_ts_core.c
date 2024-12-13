@@ -2826,41 +2826,27 @@ static int goodix_set_cur_value(int gtp_mode, int gtp_value)
 		ts_err("initialization not completed, return");
 		return 0;
 	}
-/* N17 code for HQ-290598 by jiangyue at 2023/6/6 start */
-	if (gtp_mode == Touch_Doubletap_Mode && goodix_core_data && gtp_value >= 0) {
-		xiaomi_touch_interfaces.touch_mode[gtp_mode][SET_CUR_VALUE] = gtp_value;
-		xiaomi_touch_interfaces.touch_mode[gtp_mode][GET_CUR_VALUE] = gtp_value;
-		if (gtp_value) {
-			goodix_core_data->gesture_type |= GESTURE_DOUBLE_TAP;
-		} else  {
-			goodix_core_data->gesture_type &= ~GESTURE_DOUBLE_TAP;
-		}
-		queue_work(goodix_core_data->gesture_wq, &goodix_core_data->gesture_work);
-		return 0;
-	}
 
-	if (gtp_mode == Touch_Singletap_Gesture && goodix_core_data && gtp_value >= 0) {
-		xiaomi_touch_interfaces.touch_mode[gtp_mode][SET_CUR_VALUE] = gtp_value;
-		xiaomi_touch_interfaces.touch_mode[gtp_mode][GET_CUR_VALUE] = gtp_value;
-		if (gtp_value) {
-			goodix_core_data->gesture_type |= GESTURE_SINGLE_TAP;
-		} else  {
-			goodix_core_data->gesture_type &= ~GESTURE_SINGLE_TAP;
-		}
-		queue_work(goodix_core_data->gesture_wq, &goodix_core_data->gesture_work);
-		return 0;
+	switch (gtp_mode) {
+		case Touch_Doubletap_Mode:
+			if (gtp_value)
+				goodix_core_data->gesture_type |= GESTURE_DOUBLE_TAP;
+			else
+				goodix_core_data->gesture_type &= ~GESTURE_DOUBLE_TAP;
+			break;
+		case Touch_Singletap_Gesture:
+			if (gtp_value)
+				goodix_core_data->gesture_type |= GESTURE_SINGLE_TAP;
+			else
+				goodix_core_data->gesture_type &= ~GESTURE_DOUBLE_TAP;
+			break;
+		case Touch_Nonui_Mode:
+			goodix_core_data->nonui_status = gtp_value;
+			break;
+		default:
+			return 0;
 	}
-
-/* N17 code for HQ-290598 by jiangyue at 2023/6/6 end */
-
-	if (gtp_mode == Touch_Nonui_Mode && goodix_core_data &&
-	    gtp_value >= 0) {
-		goodix_core_data->nonui_status = gtp_value;
-		ts_info("Touch_Nonui_Mode value [%d]\n", gtp_value);
-		queue_work(goodix_core_data->gesture_wq,
-				   &goodix_core_data->gesture_work);
-		return 0;
-	}
+	queue_work(goodix_core_data->gesture_wq, &goodix_core_data->gesture_work);
 
 /* N17 code for HQ-322938 by zhangzhijian5 at 2023/8/28 start */
 	if (gtp_mode >= Touch_Mode_NUM) {
@@ -2894,14 +2880,21 @@ static int goodix_set_cur_value(int gtp_mode, int gtp_value)
 
 static int goodix_get_mode_value(int mode, int value_type)
 {
-	int value = -1;
-
 	if (mode < Touch_Mode_NUM && mode >= 0)
-		value = xiaomi_touch_interfaces.touch_mode[mode][value_type];
+		switch (mode) {
+			case Touch_Doubletap_Mode:
+				return (goodix_core_data->gesture_type & GESTURE_DOUBLE_TAP) != 0;
+			case Touch_Singletap_Gesture:
+				return (goodix_core_data->gesture_type & GESTURE_SINGLE_TAP) != 0;
+			case Touch_Nonui_Mode:
+				return goodix_core_data->nonui_status;
+			default:
+				return xiaomi_touch_interfaces.touch_mode[mode][value_type];
+		}
 	else
 		ts_err("don't support");
 
-	return value;
+	return -1;
 }
 
 static int goodix_get_mode_all(int mode, int *value)
