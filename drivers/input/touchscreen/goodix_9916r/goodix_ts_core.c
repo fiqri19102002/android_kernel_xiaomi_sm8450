@@ -2693,8 +2693,10 @@ static void goodix_set_gesture_work(struct work_struct *work)
 	struct goodix_ts_core *core_data =
 		container_of(work, struct goodix_ts_core, gesture_work);
 
-	if(core_data->gesture_type != 0)
+	if (atomic_read(&core_data->suspended) && core_data->gesture_type != 0) {
 		goodix_gesture_enable(core_data->gesture_type != 0);
+		core_data->hw_ops->gesture(core_data, core_data->gesture_type);
+	}
 }
 /* N17 code for HQ-290808 by jiangyue at 2023/6/19 end */
 /* N17 code for HQ-290598 by jiangyue at 2023/6/6 end */
