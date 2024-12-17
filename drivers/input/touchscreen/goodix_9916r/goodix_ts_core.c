@@ -2841,7 +2841,7 @@ static int goodix_set_cur_value(int gtp_mode, int gtp_value)
 				goodix_core_data->gesture_type &= ~GESTURE_DOUBLE_TAP;
 			break;
 		case Touch_Nonui_Mode:
-			goodix_core_data->nonui_status = gtp_value;
+			goodix_core_data->nonui_enabled = gtp_value != 0;
 			break;
 		default:
 			return 0;
@@ -2887,7 +2887,7 @@ static int goodix_get_mode_value(int mode, int value_type)
 			case Touch_Singletap_Gesture:
 				return (goodix_core_data->gesture_type & GESTURE_SINGLE_TAP) != 0;
 			case Touch_Nonui_Mode:
-				return goodix_core_data->nonui_status;
+				return goodix_core_data->nonui_enabled ? 2 : 0;
 			default:
 				return xiaomi_touch_interfaces.touch_mode[mode][value_type];
 		}
