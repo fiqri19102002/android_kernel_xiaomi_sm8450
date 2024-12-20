@@ -798,6 +798,37 @@ static ssize_t goodix_ts_double_tap_store(struct device *dev,
 	return count;
 }
 
+/* single tap gesture show */
+static ssize_t goodix_ts_single_tap_show(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	int r = 0;
+
+	r = snprintf(buf, PAGE_SIZE, "state:%s\n",
+			goodix_core_data->single_wakeup ?
+			"enabled" : "disabled");
+
+	return r;
+}
+
+/* single tap gesture store */
+static ssize_t goodix_ts_single_tap_store(struct device *dev,
+					struct device_attribute *attr,
+					const char *buf, size_t count)
+{
+	if (!buf || count <= 0)
+		return -EINVAL;
+
+	if (buf[0] != '0') {
+		goodix_core_data->single_wakeup = 1;
+		queue_work(goodix_core_data->gesture_wq, &goodix_core_data->gesture_work);
+	} else {
+		goodix_core_data->single_wakeup = 0;
+		queue_work(goodix_core_data->gesture_wq, &goodix_core_data->gesture_work);
+	}
+	return count;
+}
+
 /* aod gesture show */
 static ssize_t goodix_ts_aod_show(struct device *dev,
 				struct device_attribute *attr, char *buf)
@@ -904,6 +935,7 @@ static DEVICE_ATTR_RW(goodix_ts_irq_info);
 static DEVICE_ATTR_RW(goodix_ts_esd_info);
 static DEVICE_ATTR_RW(goodix_ts_debug_log);
 static DEVICE_ATTR_RW(goodix_ts_double_tap);
+static DEVICE_ATTR_RW(goodix_ts_single_tap);
 static DEVICE_ATTR_RW(goodix_ts_aod);
 static DEVICE_ATTR_RW(goodix_ts_report_rate);
 static DEVICE_ATTR_RW(goodix_ts_fod);
@@ -918,6 +950,7 @@ static struct attribute *sysfs_attrs[] = {
 	&dev_attr_goodix_ts_esd_info.attr,
 	&dev_attr_goodix_ts_debug_log.attr,
 	&dev_attr_goodix_ts_double_tap.attr,
+	&dev_attr_goodix_ts_single_tap.attr,
 	&dev_attr_goodix_ts_aod.attr,
 	&dev_attr_goodix_ts_report_rate.attr,
 	&dev_attr_goodix_ts_fod.attr,
@@ -2818,10 +2851,11 @@ static void goodix_set_gesture_work(struct work_struct *work)
 	struct goodix_ts_core *core_data =
 		container_of(work, struct goodix_ts_core, gesture_work);
 	ts_debug("double is 0x%x", core_data->double_wakeup);
+	ts_debug("single is 0x%x", core_data->single_wakeup);
 	ts_debug("aod is 0x%x", core_data->aod_status);
 	ts_debug("fod is 0x%x", core_data->fod_status);
 	ts_debug("enable is 0x%x", core_data->gesture_enabled);
-	if ((core_data->double_wakeup) || (core_data->aod_status) ||
+	if ((core_data->double_wakeup) || (core_data->single_wakeup) || (core_data->aod_status) ||
 				(core_data->fod_status != -1 && core_data->fod_status != 100))
 		core_data->gesture_enabled |= (1 << 0);
 	else
@@ -2958,6 +2992,11 @@ static int goodix_set_cur_value(int gtp_mode, int gtp_value)
 	}
 	if (gtp_mode == Touch_Doubletap_Mode && goodix_core_data && gtp_value >= 0) {
 		goodix_core_data->double_wakeup = gtp_value;
+		queue_work(goodix_core_data->gesture_wq, &goodix_core_data->gesture_work);
+		return 0;
+	}
+	if (gtp_mode == Touch_Singletap_Gesture && goodix_core_data && gtp_value >= 0) {
+		goodix_core_data->single_wakeup = gtp_value;
 		queue_work(goodix_core_data->gesture_wq, &goodix_core_data->gesture_work);
 		return 0;
 	}
