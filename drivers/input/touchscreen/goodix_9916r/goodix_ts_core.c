@@ -3028,7 +3028,7 @@ static int goodix_set_cur_value(int gtp_mode, int gtp_value)
 		return 0;
 	}
 
-	if (gtp_mode ==  Touch_Nonui_Mode && goodix_core_data && gtp_value >= 0) {
+	if (gtp_mode == Touch_Nonui_Mode && goodix_core_data && gtp_value >= 0) {
 		goodix_core_data->nonui_status = gtp_value;
 		ts_info("Touch_Nonui_Mode value [%d]\n", gtp_value);
 		queue_work(goodix_core_data->gesture_wq, &goodix_core_data->gesture_work);
@@ -3063,14 +3063,30 @@ static int goodix_set_cur_value(int gtp_mode, int gtp_value)
 
 static int goodix_get_mode_value(int mode, int value_type)
 {
-	int value = -1;
-
-	if (mode < Touch_Mode_NUM && mode >= 0)
-		value = xiaomi_touch_interfaces.touch_mode[mode][value_type];
-	else
+	if (mode < Touch_Mode_NUM && mode >= 0) {
+		switch (mode) {
+			case Touch_Doubletap_Mode:
+				return goodix_core_data->double_wakeup;
+			case Touch_Singletap_Gesture:
+				return goodix_core_data->single_wakeup;
+			case Touch_Aod_Enable:
+				return goodix_core_data->aod_status;
+			case Touch_Fod_Enable:
+				return goodix_core_data->fod_status;
+			case Touch_FodIcon_Enable:
+				return goodix_core_data->fod_icon_status;
+			case Touch_Power_Status:
+				return goodix_core_data->power_status;
+			case Touch_Nonui_Mode:
+				return goodix_core_data->nonui_status;
+			default:
+				return xiaomi_touch_interfaces.touch_mode[mode][value_type];
+		}
+	} else {
 		ts_err("don't support");
+	}
 
-	return value;
+	return -1;
 }
 
 static int goodix_get_mode_all(int mode, int *value)
