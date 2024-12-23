@@ -113,8 +113,6 @@ static int __do_register_ext_module(struct goodix_ext_module *module)
 	list_add(&module->list, insert_point->prev);
 	mutex_unlock(&goodix_modules.mutex);
 
-	ts_info("Module [%s] registered,priority:%u", module->name,
-		module->priority);
 	return 0;
 }
 
@@ -771,6 +769,33 @@ static ssize_t goodix_ts_debug_log_store(struct device *dev,
 	return count;
 }
 
+/* show die package site and mcu fabs */
+#define DIE_INFO_START_FLASH_ADDR 0x1F300
+static ssize_t die_info_show(struct device  *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct goodix_ts_core *cd = dev_get_drvdata(dev);
+	struct goodix_ts_hw_ops *hw_ops = cd->hw_ops;
+	u8 temp_buf[21];
+	u8 pkg_site;
+	u8 mcu_fab;
+	int ret;
+
+	ret = hw_ops->read_flash(cd, DIE_INFO_START_FLASH_ADDR, temp_buf, sizeof(temp_buf));
+	if (ret < 0) {
+		ts_err("read flash failed");
+		return 0;
+	}
+
+	ts_info("die info:%*ph", (int)sizeof(temp_buf), temp_buf);
+
+	pkg_site = temp_buf[1];
+	mcu_fab = temp_buf[20];
+	ret = snprintf(buf, PAGE_SIZE, "package_id:0x%02X mcu_fab:0x%02X\n", pkg_site, mcu_fab);
+
+	return ret;
+}
+
 static DEVICE_ATTR(driver_info, 0440,
 		driver_info_show, NULL);
 static DEVICE_ATTR(chip_info, 0440,
@@ -789,6 +814,8 @@ static DEVICE_ATTR(esd_info, 0664,
 		goodix_ts_esd_info_show, goodix_ts_esd_info_store);
 static DEVICE_ATTR(debug_log, 0664,
 		goodix_ts_debug_log_show, goodix_ts_debug_log_store);
+static DEVICE_ATTR(die_info, 0440,
+		die_info_show, NULL);
 
 static struct attribute *sysfs_attrs[] = {
 	&dev_attr_driver_info.attr,
@@ -800,6 +827,7 @@ static struct attribute *sysfs_attrs[] = {
 	&dev_attr_irq_info.attr,
 	&dev_attr_esd_info.attr,
 	&dev_attr_debug_log.attr,
+	&dev_attr_die_info.attr,
 	NULL,
 };
 
@@ -1116,16 +1144,18 @@ static int goodix_parse_dt(struct device_node *node,
 		return r;
 	}
 
+	/* get sleep mode flag */
+	board_data->sleep_enable = of_property_read_bool(node,
+					"goodix,sleep-enable");
 
 	/*get pen-enable switch and pen keys, must after "key map"*/
 	board_data->pen_enable = of_property_read_bool(node,
 					"goodix,pen-enable");
-	if (board_data->pen_enable)
-		ts_info("goodix pen enabled");
 
-	ts_debug("[DT]x:%d, y:%d, w:%d, p:%d", board_data->panel_max_x,
-		 board_data->panel_max_y, board_data->panel_max_w,
-		 board_data->panel_max_p);
+	ts_info("[DT]x:%d, y:%d, w:%d, p:%d sleep_enable:%d pen_enable:%d",
+		board_data->panel_max_x, board_data->panel_max_y,
+		board_data->panel_max_w, board_data->panel_max_p,
+		board_data->sleep_enable, board_data->pen_enable);
 	return 0;
 }
 #endif
@@ -1143,6 +1173,10 @@ static void goodix_ts_report_pen(struct input_dev *dev,
 		input_report_abs(dev, ABS_X, pen_data->coords.x);
 		input_report_abs(dev, ABS_Y, pen_data->coords.y);
 		input_report_abs(dev, ABS_PRESSURE, pen_data->coords.p);
+		if (pen_data->coords.p == 0)
+			input_report_abs(dev, ABS_DISTANCE, 1);
+		else
+			input_report_abs(dev, ABS_DISTANCE, 0);
 		input_report_abs(dev, ABS_TILT_X, pen_data->coords.tilt_x);
 		input_report_abs(dev, ABS_TILT_Y, pen_data->coords.tilt_y);
 		ts_debug("pen_data:x %d, y %d, p %d, tilt_x %d tilt_y %d key[%d %d]",
@@ -1548,6 +1582,7 @@ static int goodix_ts_pen_dev_config(struct goodix_ts_core *core_data)
 	input_set_abs_params(pen_dev, ABS_Y, 0, ts_bdata->panel_max_y, 0, 0);
 	input_set_abs_params(pen_dev, ABS_PRESSURE, 0,
 			ts_bdata->panel_max_p, 0, 0);
+	input_set_abs_params(pen_dev, ABS_DISTANCE, 0, 255, 0, 0);
 	input_set_abs_params(pen_dev, ABS_TILT_X,
 			-GOODIX_PEN_MAX_TILT, GOODIX_PEN_MAX_TILT, 0, 0);
 	input_set_abs_params(pen_dev, ABS_TILT_Y,
@@ -1731,11 +1766,13 @@ static void goodix_ts_release_connects(struct goodix_ts_core *core_data)
 	input_sync(input_dev);
 
 	mutex_unlock(&input_dev->mutex);
+	if (core_data->gesture_type)
+		core_data->hw_ops->after_event_handler(core_data);
 }
 
 /**
  * goodix_ts_suspend - Touchscreen suspend function
- * Called by PM/FB/EARLYSUSPEN module to put the device to  sleep
+ * Called by PM/FB/EARLYSUSPEN module to put the device to sleep
  */
 static int goodix_ts_suspend(struct goodix_ts_core *core_data)
 {
@@ -1778,8 +1815,10 @@ static int goodix_ts_suspend(struct goodix_ts_core *core_data)
 	mutex_unlock(&goodix_modules.mutex);
 
 	/* enter sleep mode or power off */
-	if (hw_ops->suspend)
+	if (core_data->board_data.sleep_enable)
 		hw_ops->suspend(core_data);
+	else
+		goodix_ts_power_off(core_data);
 
 	/* inform exteranl modules */
 	mutex_lock(&goodix_modules.mutex);
@@ -1842,8 +1881,10 @@ static int goodix_ts_resume(struct goodix_ts_core *core_data)
 	mutex_unlock(&goodix_modules.mutex);
 
 	/* reset device or power on*/
-	if (hw_ops->resume)
+	if (core_data->board_data.sleep_enable)
 		hw_ops->resume(core_data);
+	else
+		goodix_ts_power_on(core_data);
 
 	mutex_lock(&goodix_modules.mutex);
 	if (!list_empty(&goodix_modules.head)) {
@@ -1929,9 +1970,7 @@ int goodix_ts_fb_notifier_callback(struct notifier_block *self,
 	struct fb_event *fb_event = data;
 
 	if (fb_event && fb_event->data && core_data) {
-		if (event == FB_EARLY_EVENT_BLANK) {
-			/* before fb blank */
-		} else if (event == FB_EVENT_BLANK) {
+		if (event == FB_EVENT_BLANK) {
 			int *blank = fb_event->data;
 
 			if (*blank == FB_BLANK_UNBLANK)
@@ -2051,7 +2090,7 @@ int goodix_ts_stage2_init(struct goodix_ts_core *cd)
 #endif
 
 	/* inspect init */
-	inspect_module_init();
+	inspect_module_init(cd);
 
 	return 0;
 exit:
