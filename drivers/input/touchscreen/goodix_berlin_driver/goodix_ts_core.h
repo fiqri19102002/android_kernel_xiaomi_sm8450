@@ -60,6 +60,9 @@
 #define GOODIX_RETRY_5					5
 #define GOODIX_RETRY_10					10
 
+#define GOODIX_DISP_ID_DET 				420
+#define GOODIX_DISP_ID1_DET 				418
+
 #define TS_DEFAULT_FIRMWARE				"goodix_firmware.bin"
 #define TS_DEFAULT_CFG_BIN				"goodix_cfg_group.bin"
 
@@ -314,8 +317,6 @@ struct goodix_ts_board_data {
 	int irq_gpio;
 	int avdd_gpio;
 	int iovdd_gpio;
-	int panel_id_gpio_a;
-	int panel_id_gpio_b;
 	unsigned int  irq_flags;
 
 	unsigned int swap_axis;
