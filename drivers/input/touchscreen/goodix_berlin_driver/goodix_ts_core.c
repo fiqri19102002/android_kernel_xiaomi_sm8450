@@ -2170,7 +2170,7 @@ static int goodix_ts_pm_suspend(struct device *dev)
 	if (device_may_wakeup(dev) && gesture_is_enabled)
 		enable_irq_wake(core_data->irq);
 
-	return goodix_ts_suspend(core_data);
+	return 0;
 }
 /**
  * goodix_ts_pm_resume - PM resume function
@@ -2184,7 +2184,7 @@ static int goodix_ts_pm_resume(struct device *dev)
 	if (device_may_wakeup(dev) && gesture_is_enabled)
 		disable_irq_wake(core_data->irq);
 
-	return goodix_ts_resume(core_data);
+	return 0;
 }
 #endif
 
