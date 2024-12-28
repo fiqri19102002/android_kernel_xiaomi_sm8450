@@ -2163,7 +2163,8 @@ static int goodix_ts_pm_suspend(struct device *dev)
 	struct goodix_ts_core *core_data =
 		dev_get_drvdata(dev);
 
-	if (device_may_wakeup(dev))
+	if (device_may_wakeup(dev) && (!core_data->nonui_enabled &&
+		core_data->gesture_type))
 		enable_irq_wake(core_data->irq);
 
 	return goodix_ts_suspend(core_data);
@@ -2177,7 +2178,8 @@ static int goodix_ts_pm_resume(struct device *dev)
 	struct goodix_ts_core *core_data =
 		dev_get_drvdata(dev);
 
-	if (device_may_wakeup(dev))
+	if (device_may_wakeup(dev) && (!core_data->nonui_enabled &&
+		core_data->gesture_type))
 		disable_irq_wake(core_data->irq);
 
 	return goodix_ts_resume(core_data);
