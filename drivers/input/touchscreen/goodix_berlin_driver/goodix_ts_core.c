@@ -2011,7 +2011,6 @@ static void goodix_set_gesture_work(struct work_struct *work)
 		core_data->nonui_enabled ? 0 : core_data->gesture_type;
 
 	if (target_gesture_type == 0) {
-		disable_irq_wake(core_data->irq);
 		hw_ops->irq_enable(core_data, false);
 		hw_ops->gesture(core_data, 0);
 		goto exit;
@@ -2026,7 +2025,6 @@ static void goodix_set_gesture_work(struct work_struct *work)
 		ts_err("enter gesture mode");
 	}
 	hw_ops->irq_enable(core_data, true);
-	enable_irq_wake(core_data->irq);
 
 exit:
 	pm_relax(core_data->bus->dev);
@@ -2165,6 +2163,9 @@ static int goodix_ts_pm_suspend(struct device *dev)
 	struct goodix_ts_core *core_data =
 		dev_get_drvdata(dev);
 
+	if (device_may_wakeup(dev))
+		enable_irq_wake(core_data->irq);
+
 	return goodix_ts_suspend(core_data);
 }
 /**
@@ -2175,6 +2176,9 @@ static int goodix_ts_pm_resume(struct device *dev)
 {
 	struct goodix_ts_core *core_data =
 		dev_get_drvdata(dev);
+
+	if (device_may_wakeup(dev))
+		disable_irq_wake(core_data->irq);
 
 	return goodix_ts_resume(core_data);
 }
@@ -2598,6 +2602,9 @@ static int goodix_ts_probe(struct platform_device *pdev)
 
 	/* debug node init */
 	goodix_tools_init();
+
+	device_init_wakeup(core_data->bus->dev, 1);
+	device_init_wakeup(&pdev->dev, 1);
 
 	core_data->init_stage = CORE_INIT_STAGE1;
 	goodix_modules.core_data = core_data;
