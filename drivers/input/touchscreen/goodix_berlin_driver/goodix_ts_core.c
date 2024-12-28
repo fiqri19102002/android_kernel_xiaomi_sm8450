@@ -2155,8 +2155,7 @@ int goodix_ts_fb_notifier_callback(struct notifier_block *self,
 #endif
 
 
-#if defined(CONFIG_PM) && !defined(CONFIG_DRM)
-#if !defined(CONFIG_FB) && !defined(CONFIG_HAS_EARLYSUSPEND)
+#ifdef CONFIG_PM
 /**
  * goodix_ts_pm_suspend - PM suspend function
  * Called by kernel during system suspend phrase
@@ -2179,7 +2178,6 @@ static int goodix_ts_pm_resume(struct device *dev)
 
 	return goodix_ts_resume(core_data);
 }
-#endif
 #endif
 
 /**
@@ -2660,12 +2658,10 @@ static int goodix_ts_remove(struct platform_device *pdev)
 	return 0;
 }
 
-#if defined(CONFIG_PM) && !defined(CONFIG_DRM)
+#ifdef CONFIG_PM
 static const struct dev_pm_ops dev_pm_ops = {
-#if !defined(CONFIG_FB) && !defined(CONFIG_HAS_EARLYSUSPEND)
 	.suspend = goodix_ts_pm_suspend,
 	.resume = goodix_ts_pm_resume,
-#endif
 };
 #endif
 
@@ -2679,7 +2675,7 @@ static struct platform_driver goodix_ts_driver = {
 	.driver = {
 		.name = GOODIX_CORE_DRIVER_NAME,
 		.owner = THIS_MODULE,
-#if defined(CONFIG_PM) && !defined(CONFIG_DRM)
+#ifdef CONFIG_PM
 		.pm = &dev_pm_ops,
 #endif
 	},
