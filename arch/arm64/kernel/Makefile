@@ -22,6 +22,8 @@ obj-y			:= debug-monitors.o entry.o irq.o fpsimd.o		\
 
 targets			+= efi-entry.o
 
+CFLAGS_stacktrace.o += -Wno-frame-address
+
 OBJCOPYFLAGS := --prefix-symbols=__efistub_
 $(obj)/%.stub.o: $(obj)/%.o FORCE
 	$(call if_changed,objcopy)
