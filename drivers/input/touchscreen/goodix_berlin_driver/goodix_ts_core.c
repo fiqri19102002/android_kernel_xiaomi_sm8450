@@ -1948,8 +1948,6 @@ static int goodix_ts_resume(struct goodix_ts_core *core_data)
 	ts_info("Resume start");
 	atomic_set(&core_data->suspended, 0);
 
-	cancel_delayed_work_sync(&core_data->gesture_work);
-
 	mutex_lock(&goodix_modules.mutex);
 	if (!list_empty(&goodix_modules.head)) {
 		list_for_each_entry_safe(ext_module, next,
@@ -2009,9 +2007,8 @@ static void goodix_resume_work(struct work_struct *work)
 
 static void goodix_set_gesture_work(struct work_struct *work)
 {
-	struct delayed_work *dwork = to_delayed_work(work);
 	struct goodix_ts_core *core_data =
-		container_of(dwork, struct goodix_ts_core, gesture_work);
+		container_of(work, struct goodix_ts_core, gesture_work);
 	struct goodix_ts_hw_ops *hw_ops = core_data->hw_ops;
 	unsigned int target_gesture_type;
 	int res;
@@ -2065,8 +2062,7 @@ static int goodix_set_cur_value(void *private, enum touch_mode mode, int value)
 		return -EINVAL;
 	}
 
-	queue_delayed_work(ts_core->gesture_wq, &ts_core->gesture_work,
-			   msecs_to_jiffies(GOODIX_NORMAL_GESTURE_DELAY_MS));
+	queue_work(ts_core->gesture_wq, &ts_core->gesture_work);
 
 	return 0;
 }
@@ -2274,7 +2270,7 @@ int goodix_ts_stage2_init(struct goodix_ts_core *cd)
 		ret = -ENOMEM;
 		goto exit;
 	}
-	INIT_DELAYED_WORK(&cd->gesture_work, goodix_set_gesture_work);
+	INIT_WORK(&cd->gesture_work, goodix_set_gesture_work);
 #if defined(CONFIG_DRM)
 	if (active_panel)
 		goodix_register_for_panel_events(cd->bus->dev->of_node, cd);

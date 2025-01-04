@@ -56,7 +56,6 @@
 #define GOODIX_GESTURE_DATA_LEN			16
 
 #define GOODIX_NORMAL_RESET_DELAY_MS	100
-#define GOODIX_NORMAL_GESTURE_DELAY_MS 300
 #define GOODIX_HOLD_CPU_RESET_DELAY_MS  5
 
 #define GOODIX_RETRY_3					3
@@ -579,7 +578,7 @@ struct goodix_ts_core {
 	struct xiaomi_touch_interface xiaomi_touch;
 
 	struct workqueue_struct *gesture_wq;
-	struct delayed_work gesture_work;
+	struct work_struct gesture_work;
 
 	bool tp_pm_suspend;
 	struct completion pm_resume_completion;
