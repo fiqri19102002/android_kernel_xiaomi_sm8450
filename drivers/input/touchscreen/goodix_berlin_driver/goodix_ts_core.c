@@ -2011,28 +2011,17 @@ static void goodix_set_gesture_work(struct work_struct *work)
 		container_of(work, struct goodix_ts_core, gesture_work);
 	struct goodix_ts_hw_ops *hw_ops = core_data->hw_ops;
 	unsigned int target_gesture_type;
-	int res;
-
-	if (!atomic_read(&core_data->suspended)) {
-		ts_debug("touch is not suspended, skip re-wake");
-		return;
-	}
 
 	target_gesture_type =
 		core_data->nonui_enabled ? 0 : core_data->gesture_type;
 
-	if (target_gesture_type == 0) {
+	if (atomic_read(&core_data->suspended) == 1 && target_gesture_type != 0) {
+		gesture_is_enabled = true;
+		hw_ops->gesture(core_data, target_gesture_type);
+	} else {
 		gesture_is_enabled = false;
 		hw_ops->gesture(core_data, 0);
 	}
-
-	res = hw_ops->gesture(core_data, target_gesture_type);
-	if (res) {
-		ts_err("failed enter gesture mode");
-	} else {
-		ts_err("enter gesture mode");
-	}
-	gesture_is_enabled = true;
 }
 
 static int goodix_set_cur_value(void *private, enum touch_mode mode, int value)
