@@ -1349,6 +1349,7 @@ static irqreturn_t goodix_ts_threadirq_func(int irq, void *data)
 
 	ts_esd->irq_status = true;
 	core_data->irq_trig_cnt++;
+	pm_stay_awake(core_data->bus->dev);
 	/* inform external module */
 	mutex_lock(&goodix_modules.mutex);
 	list_for_each_entry_safe(ext_module, next,
@@ -1381,6 +1382,7 @@ static irqreturn_t goodix_ts_threadirq_func(int irq, void *data)
 			goodix_ts_request_handle(core_data, ts_event);
 	}
 
+	pm_relax(core_data->bus->dev);
 	return IRQ_HANDLED;
 }
 
@@ -2007,8 +2009,6 @@ static void goodix_set_gesture_work(struct work_struct *work)
 		return;
 	}
 
-	pm_stay_awake(core_data->bus->dev);
-
 	target_gesture_type =
 		core_data->nonui_enabled ? 0 : core_data->gesture_type;
 
@@ -2016,22 +2016,17 @@ static void goodix_set_gesture_work(struct work_struct *work)
 		gesture_is_enabled = false;
 		hw_ops->irq_enable(core_data, false);
 		hw_ops->gesture(core_data, 0);
-		goto exit;
 	}
 
 	hw_ops->reset(core_data, GOODIX_NORMAL_RESET_DELAY_MS);
 	res = hw_ops->gesture(core_data, target_gesture_type);
 	if (res) {
 		ts_err("failed enter gesture mode");
-		goto exit;
 	} else {
 		ts_err("enter gesture mode");
 	}
 	hw_ops->irq_enable(core_data, true);
 	gesture_is_enabled = true;
-
-exit:
-	pm_relax(core_data->bus->dev);
 }
 
 static int goodix_set_cur_value(void *private, enum touch_mode mode, int value)
