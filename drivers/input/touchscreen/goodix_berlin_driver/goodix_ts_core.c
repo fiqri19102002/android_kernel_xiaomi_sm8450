@@ -1350,6 +1350,18 @@ static irqreturn_t goodix_ts_threadirq_func(int irq, void *data)
 	ts_esd->irq_status = true;
 	core_data->irq_trig_cnt++;
 	pm_stay_awake(core_data->bus->dev);
+#ifdef CONFIG_PM
+	if (core_data->tp_pm_suspend) {
+		ts_info("device in suspend, wait to resume");
+		ret = wait_for_completion_timeout(&core_data->pm_resume_completion, msecs_to_jiffies(300));
+		if (!ret) {
+			pm_relax(core_data->bus->dev);
+			ts_err("system can't finish resuming procedure");
+			return IRQ_HANDLED;
+		}
+	}
+#endif
+
 	/* inform external module */
 	mutex_lock(&goodix_modules.mutex);
 	list_for_each_entry_safe(ext_module, next,
@@ -2165,6 +2177,9 @@ static int goodix_ts_pm_suspend(struct device *dev)
 	if (device_may_wakeup(dev) && gesture_is_enabled)
 		enable_irq_wake(core_data->irq);
 
+	core_data->tp_pm_suspend = true;
+	reinit_completion(&core_data->pm_resume_completion);
+
 	return 0;
 }
 /**
@@ -2178,6 +2193,9 @@ static int goodix_ts_pm_resume(struct device *dev)
 
 	if (device_may_wakeup(dev) && gesture_is_enabled)
 		disable_irq_wake(core_data->irq);
+
+	core_data->tp_pm_suspend = false;
+	complete(&core_data->pm_resume_completion);
 
 	return 0;
 }
@@ -2602,6 +2620,7 @@ static int goodix_ts_probe(struct platform_device *pdev)
 	/* debug node init */
 	goodix_tools_init();
 
+	core_data->tp_pm_suspend = false;
 	device_init_wakeup(core_data->bus->dev, 1);
 	device_init_wakeup(&pdev->dev, 1);
 

@@ -581,6 +581,9 @@ struct goodix_ts_core {
 	struct workqueue_struct *gesture_wq;
 	struct delayed_work gesture_work;
 
+	bool tp_pm_suspend;
+	struct completion pm_resume_completion;
+
 	bool nonui_enabled;
 };
 
