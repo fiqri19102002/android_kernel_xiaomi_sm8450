@@ -37,6 +37,8 @@
 #define GOODIX_DEFAULT_CFG_NAME		"goodix_cfg_group.cfg"
 #define GOOIDX_INPUT_PHYS			"goodix_ts/input0"
 
+static bool gesture_is_enabled = false;
+
 #if defined(CONFIG_DRM)
 static struct drm_panel *active_panel;
 static void goodix_panel_notifier_callback(enum panel_event_notifier_tag tag,
@@ -2011,6 +2013,7 @@ static void goodix_set_gesture_work(struct work_struct *work)
 		core_data->nonui_enabled ? 0 : core_data->gesture_type;
 
 	if (target_gesture_type == 0) {
+		gesture_is_enabled = false;
 		hw_ops->irq_enable(core_data, false);
 		hw_ops->gesture(core_data, 0);
 		goto exit;
@@ -2025,6 +2028,7 @@ static void goodix_set_gesture_work(struct work_struct *work)
 		ts_err("enter gesture mode");
 	}
 	hw_ops->irq_enable(core_data, true);
+	gesture_is_enabled = true;
 
 exit:
 	pm_relax(core_data->bus->dev);
@@ -2163,8 +2167,7 @@ static int goodix_ts_pm_suspend(struct device *dev)
 	struct goodix_ts_core *core_data =
 		dev_get_drvdata(dev);
 
-	if (device_may_wakeup(dev) && (!core_data->nonui_enabled &&
-		core_data->gesture_type))
+	if (device_may_wakeup(dev) && gesture_is_enabled)
 		enable_irq_wake(core_data->irq);
 
 	return goodix_ts_suspend(core_data);
@@ -2178,8 +2181,7 @@ static int goodix_ts_pm_resume(struct device *dev)
 	struct goodix_ts_core *core_data =
 		dev_get_drvdata(dev);
 
-	if (device_may_wakeup(dev) && (!core_data->nonui_enabled &&
-		core_data->gesture_type))
+	if (device_may_wakeup(dev) && gesture_is_enabled)
 		disable_irq_wake(core_data->irq);
 
 	return goodix_ts_resume(core_data);
