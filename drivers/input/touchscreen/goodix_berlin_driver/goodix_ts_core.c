@@ -2026,18 +2026,15 @@ static void goodix_set_gesture_work(struct work_struct *work)
 
 	if (target_gesture_type == 0) {
 		gesture_is_enabled = false;
-		hw_ops->irq_enable(core_data, false);
 		hw_ops->gesture(core_data, 0);
 	}
 
-	hw_ops->reset(core_data, GOODIX_NORMAL_RESET_DELAY_MS);
 	res = hw_ops->gesture(core_data, target_gesture_type);
 	if (res) {
 		ts_err("failed enter gesture mode");
 	} else {
 		ts_err("enter gesture mode");
 	}
-	hw_ops->irq_enable(core_data, true);
 	gesture_is_enabled = true;
 }
 
