@@ -72,7 +72,7 @@ static struct oneshot_sensor *oneshot_sensor_map[ONESHOT_SENSOR_TYPE_NUM];
 static atomic_t oneshot_sensor_enabled_requested[ONESHOT_SENSOR_TYPE_NUM];
 static atomic_t oneshot_sensor_enabled[ONESHOT_SENSOR_TYPE_NUM];
 
-static atomic_t suspended;
+static atomic_t suspended = ATOMIC_INIT(0);
 
 static struct workqueue_struct *oneshot_sensor_enable_wq;
 static struct delayed_work oneshot_sensor_enable_work;
