@@ -77,6 +77,13 @@ static atomic_t suspended;
 static struct workqueue_struct *oneshot_sensor_enable_wq;
 static struct delayed_work oneshot_sensor_enable_work;
 
+/*
+ * Controls whether gestures are reported up to userspace.
+ * Userspace can set this using the TOUCH_MODE_NONUI_MODE
+ * command to enable/disable this mode.
+ */
+static atomic_t pocket_disable_gestures = ATOMIC_INIT(0);
+
 int register_xiaomi_touch_client(enum touch_id touch_id,
 				 struct xiaomi_touch_interface *interface)
 {
@@ -108,9 +115,14 @@ int notify_oneshot_sensor(enum oneshot_sensor_type sensor_type, int value)
 		       sensor_type);
 		return -EINVAL;
 	}
-	sensor = oneshot_sensor_map[sensor_type];
-	atomic_set(&sensor->pending_event, value);
-	sysfs_notify(&touch_dev->kobj, NULL, sensor->status_name);
+	if (atomic_read(&pocket_disable_gestures)) {
+		pr_info("gesture of type %d with value %d ignored due to pocket/nonui mode\n",
+			sensor_type, value);
+	} else {
+		sensor = oneshot_sensor_map[sensor_type];
+		atomic_set(&sensor->pending_event, value);
+		sysfs_notify(&touch_dev->kobj, NULL, sensor->status_name);
+	}
 
 	return 0;
 }
@@ -264,6 +276,11 @@ static long xiaomi_touch_dev_ioctl(struct file *file, unsigned int cmd,
 	pr_info("cmd: %d, mode: %d, value: %d\n", _IOC_NR(cmd), request.mode,
 		request.value);
 
+	if (request.mode == TOUCH_MODE_NONUI_MODE) {
+		atomic_set(&pocket_disable_gestures, request.value);
+		goto end;
+	}
+
 	interface = interfaces[TOUCH_ID_PRIMARY];
 	if (!interface || !interface->get_mode_value ||
 	    !interface->set_mode_value)
@@ -282,6 +299,7 @@ static long xiaomi_touch_dev_ioctl(struct file *file, unsigned int cmd,
 		return -EINVAL;
 	}
 
+end:
 	return copy_to_user((int __user *)arg, &request, sizeof(request));
 }
 
